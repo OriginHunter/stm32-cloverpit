@@ -1,0 +1,189 @@
+#include "headerfile.h"
+
+#define X 75
+#define Y 60
+#define H 40
+#define W 40
+
+uint8_t key;
+uint8_t key1_0 = 1,key1_1 = 1;
+uint8_t key2_0 = 1,key2_1 = 1;
+uint8_t key3_0 = 1,key3_1 = 1;
+uint8_t key4_0 = 1,key4_1 = 1;
+
+uint32_t ms;
+uint8_t n = 0;
+uint8_t s = 55;
+uint8_t m = 59;
+uint8_t h = 23;
+uint8_t led = 0x01;
+char text[20];
+char result[3][5] = {{ 0, 1, 2, 3, 4},
+                     { 5, 6, 7, 8, 9},
+                     {10,11,12,13,14}};                     
+char result2[15];
+char had_pattern[15];
+uint32_t random32bit;
+uint32_t coin;
+uint16_t Image[1600*9];
+ //初始化结构体数组，顺序与枚举值严格对应
+
+void getResults(void)
+{
+      HAL_RNG_GenerateRandomNumber(&hrng,&random32bit);
+}
+
+void start(void)
+{
+  uint8_t n = 0;
+  if(n > 14){n = 0;}  
+  for(int i = 0;i < 3;i++)
+  {
+    for(int j = 0;j < 5;j++)
+    {
+      getResults();
+      result[i][j] = random32bit%7;
+      result2[n++] = result[i][j];
+    }
+  }
+  coin = 0;
+  char a = 0;
+  if(patIsSame(result2,g_Patterns[0].arr,g_Patterns[0].len))
+  {
+    coin += g_Patterns[0].value;
+  }
+  for(int i = 1;i < PATTERN_COUNT;i++)
+  {
+    if(!arrayInArrays(g_Patterns[i].arr,g_Patterns[i].len,a))
+    {
+      if(patIsSame(result2,g_Patterns[i].arr,g_Patterns[i].len))
+      {
+        coin += g_Patterns[i].value;
+        had_pattern[a++] = i;
+      }
+    }
+  }
+}  
+                     
+void LCD_MyDrawPicture2(const u16 *picture)
+{
+    int index;
+
+    LCD_WriteRAM_Prepare(); /* Prepare to write GRAM */
+    for(int i = 0;i < 40*6;i++)
+    {
+      for(index = 0+i*40; index < 1600*3+i*40; index++)
+      {
+          LCD_WriteRAM(picture[index]);
+      }
+      HAL_Delay(i/100);
+    }
+}
+
+void fun_Init(void)
+{
+  LED_Init();
+  LCD_Init();
+	HAL_Delay(100);
+  HAL_TIM_Base_Start_IT(&htim2);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_SET);
+  LCD_SetBackColor(Black);
+  LCD_SetTextColor(White);
+  LCD_Clear(Black);
+  HAL_Delay(100);
+  uint8_t n = 0;
+  for(int i = 0;i < 3;i++)
+  {
+    for(int j = 0;j < 5;j++)
+    {
+      getResults();
+      result[i][j] = random32bit%7;
+      result2[n++] = result[i][j];
+    }
+  }
+  memcpy(Image, PicAddrMap[1], 1600*2);
+  memcpy(Image+1600, PicAddrMap[2], IMG_TOTAL_PIXELS*2);
+  memcpy(Image+1600*2, PicAddrMap[3], IMG_TOTAL_PIXELS*2);
+  memcpy(Image+1600*3, PicAddrMap[4], IMG_TOTAL_PIXELS*2);
+  memcpy(Image+1600*4, PicAddrMap[5], IMG_TOTAL_PIXELS*2);
+  memcpy(Image+1600*5, PicAddrMap[6], IMG_TOTAL_PIXELS*2);
+  memcpy(Image+1600*6, PicAddrMap[7], IMG_TOTAL_PIXELS*2);
+  memcpy(Image+1600*7, PicAddrMap[6], IMG_TOTAL_PIXELS*2);
+  memcpy(Image+1600*8, PicAddrMap[7], IMG_TOTAL_PIXELS*2);
+}
+
+void fun(void)
+{
+  LED_Show();
+  LCD_Show();
+  key = KEY_Scan(ms);
+  if(key)
+  {
+    if(key == 1)
+    {
+      start();
+    }
+  }
+  if(s >= 60)
+  {
+    s = 0;
+    m++;
+  }
+  if(m >= 60)
+  {
+    m = 0;
+    h++;
+  }
+  if(h >= 24)
+  {
+    h = 0;
+  }
+ }
+void LED_Show(void)
+{
+    LED_Set(led);
+}
+void LCD_Show(void)
+{
+  for(int i = 0;i < 3;i++)
+  {
+    for(int j = 0;j < 5;j++)
+    {
+      LCD_MySetDisplayWindow(X+i*50, Y+j*42, H, W);
+      LCD_MyDrawPicture(PicAddrMap[result[i][j]+1]);
+    }
+  }
+//    for(int j = 4;j > -1;j--)
+//    {
+//      LCD_MySetDisplayWindow(X+10, Y+j*42, H*3, W);
+//      LCD_MyDrawPicture2(Image);
+//    }
+  
+  LCD_WindowModeDisable();
+  sprintf(text,"        coin:%d         ",coin);
+  LCD_DisplayStringLine(Line1, (unsigned char *)text);
+  sprintf(text,"     Time:%d:%d:%d         ",h,m,s);
+  LCD_DisplayStringLine(Line0, (unsigned char *)text);
+}
+
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if(htim->Instance == TIM2)
+  {
+    ms++;
+     if(ms%1000 <= n*10)
+    {
+      led = 0x01;
+    }
+    else
+    {
+      led = 0x00;
+    }
+
+    if(ms%1000 == 0)
+    {
+      s++;
+    }
+  }
+}
